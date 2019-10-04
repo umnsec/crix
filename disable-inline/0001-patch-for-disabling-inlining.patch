@@ -1,0 +1,184 @@
+From 21f8253ca9eeb17b09c36cc63c151846a4b3de88 Mon Sep 17 00:00:00 2001
+From: Kangjie Lu <kjlu@umn.edu>
+Date: Thu, 12 Sep 2019 12:33:46 -0500
+Subject: [PATCH] patch for disabling inlining
+
+---
+ clang/lib/CodeGen/CGCall.cpp              | 16 +++++++++-
+ clang/lib/CodeGen/CGCall.h                |  3 ++
+ clang/lib/CodeGen/CodeGenModule.cpp       | 38 ++++++++++++++++++++---
+ clang/lib/Frontend/CompilerInvocation.cpp | 13 ++++++++
+ 6 files changed, 69 insertions(+), 5 deletions(-)
+ create mode 100644 VERSION
+
+diff --git a/clang/lib/CodeGen/CGCall.cpp b/clang/lib/CodeGen/CGCall.cpp
+index 00180d96cf0..2da93c9d823 100644
+--- a/clang/lib/CodeGen/CGCall.cpp
++++ b/clang/lib/CodeGen/CGCall.cpp
+@@ -4292,12 +4292,26 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
+ 
+   // Apply always_inline to all calls within flatten functions.
+   // FIXME: should this really take priority over __try, below?
++
++
++  // nvd: for disabling inlining
++#ifndef KA_DISABLE_INLINING
+   if (CurCodeDecl && CurCodeDecl->hasAttr<FlattenAttr>() &&
+-      !(TargetDecl && TargetDecl->hasAttr<NoInlineAttr>())) {
++      !(Callee.getAbstractInfo().getCalleeDecl().getDecl() &&
++        Callee.getAbstractInfo()
++            .getCalleeDecl()
++            .getDecl()
++            ->hasAttr<NoInlineAttr>())) {
+     Attrs =
+         Attrs.addAttribute(getLLVMContext(), llvm::AttributeList::FunctionIndex,
+                            llvm::Attribute::AlwaysInline);
+   }
++#else
++    Attrs = 
++        Attrs.addAttribute(getLLVMContext(), llvm::AttributeList::FunctionIndex,
++                llvm::Attribute::NoInline);
++#endif
++
+ 
+   // Disable inlining inside SEH __try blocks.
+   if (isSEHTryScope()) {
+diff --git a/clang/lib/CodeGen/CGCall.h b/clang/lib/CodeGen/CGCall.h
+index cc11ded704a..30b49a8def3 100644
+--- a/clang/lib/CodeGen/CGCall.h
++++ b/clang/lib/CodeGen/CGCall.h
+@@ -24,6 +24,9 @@
+ // FIXME: Restructure so we don't have to expose so much stuff.
+ #include "ABIInfo.h"
+ 
++// patched by Navid Emamdoost
++#define KA_DISABLE_INLINING 1
++
+ namespace llvm {
+ class AttributeList;
+ class Function;
+diff --git a/clang/lib/CodeGen/CodeGenModule.cpp b/clang/lib/CodeGen/CodeGenModule.cpp
+index be7dfc97a98..c7c5fa1a700 100644
+--- a/clang/lib/CodeGen/CodeGenModule.cpp
++++ b/clang/lib/CodeGen/CodeGenModule.cpp
+@@ -1498,12 +1498,23 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
+       B.addAttribute(llvm::Attribute::StackProtectReq);
+   }
+ 
++#ifdef KA_DISABLE_INLINING
++  if (F->hasFnAttribute(llvm::Attribute::AlwaysInline)){
++	  F->removeFnAttr(llvm::Attribute::AlwaysInline);
++  }
++  B.addAttribute(llvm::Attribute::NoInline);
++#endif
++
+   if (!D) {
+     // If we don't have a declaration to control inlining, the function isn't
+     // explicitly marked as alwaysinline for semantic reasons, and inlining is
+     // disabled, mark the function as noinline.
+-    if (!F->hasFnAttribute(llvm::Attribute::AlwaysInline) &&
+-        CodeGenOpts.getInlining() == CodeGenOptions::OnlyAlwaysInlining)
++
++	// nvd
++#ifndef KA_DISABLE_INLINING
++  if (!F->hasFnAttribute(llvm::Attribute::AlwaysInline) &&
++		  CodeGenOpts.getInlining() == CodeGenOptions::OnlyAlwaysInlining)
++#endif
+       B.addAttribute(llvm::Attribute::NoInline);
+ 
+     F->addAttributes(llvm::AttributeList::FunctionIndex, B);
+@@ -1543,16 +1554,23 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
+     B.addAttribute(llvm::Attribute::NoDuplicate);
+   } else if (D->hasAttr<NoInlineAttr>()) {
+     B.addAttribute(llvm::Attribute::NoInline);
+-  } else if (D->hasAttr<AlwaysInlineAttr>() &&
++  } 
++  // nvd
++#ifndef KA_DISABLE_INLINING
++  else if (D->hasAttr<AlwaysInlineAttr>() &&
+              !F->hasFnAttribute(llvm::Attribute::NoInline)) {
+     // (noinline wins over always_inline, and we can't specify both in IR)
+     B.addAttribute(llvm::Attribute::AlwaysInline);
+-  } else if (CodeGenOpts.getInlining() == CodeGenOptions::OnlyAlwaysInlining) {
++  }
++#endif
++  else if (CodeGenOpts.getInlining() == CodeGenOptions::OnlyAlwaysInlining) {
+     // If we're not inlining, then force everything that isn't always_inline to
+     // carry an explicit noinline attribute.
+     if (!F->hasFnAttribute(llvm::Attribute::AlwaysInline))
+       B.addAttribute(llvm::Attribute::NoInline);
+   } else {
++	  // nvd
++#ifndef KA_DISABLE_INLINING
+     // Otherwise, propagate the inline hint attribute and potentially use its
+     // absence to mark things as noinline.
+     if (auto *FD = dyn_cast<FunctionDecl>(D)) {
+@@ -1577,7 +1595,13 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
+         B.addAttribute(llvm::Attribute::NoInline);
+       }
+     }
++#endif
+   }
++  
++  // nvd: overwritten inlining
++#ifdef KA_DISABLE_INLINING
++  B.addAttribute(llvm::Attribute::NoInline);
++#endif
+ 
+   // Add other optimization related attributes if we are optimizing this
+   // function.
+@@ -2649,7 +2673,13 @@ namespace {
+       } else {
+         SafeToInline = M->hasAttr<DLLImportAttr>();
+       }
++
++	  // nvd
++#ifndef KA_DISABLE_INLINING
+       return SafeToInline;
++#else
++	  return false;
++#endif
+     }
+ 
+     bool VisitCXXDeleteExpr(CXXDeleteExpr *E) {
+diff --git a/clang/lib/Frontend/CompilerInvocation.cpp b/clang/lib/Frontend/CompilerInvocation.cpp
+index f051573e5ae..1f380a2e82b 100644
+--- a/clang/lib/Frontend/CompilerInvocation.cpp
++++ b/clang/lib/Frontend/CompilerInvocation.cpp
+@@ -91,6 +91,9 @@
+ #include <utility>
+ #include <vector>
+ 
++// patched by Navid Emamdoost
++#define KA_DISABLE_INLINING 1
++
+ using namespace clang;
+ using namespace driver;
+ using namespace options;
+@@ -704,6 +707,11 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
+     }
+   }
+ 
++#ifdef KA_DISABLE_INLINING
++  // nvd: setting to OnlyAlwaysInling
++  Opts.setInlining(CodeGenOptions::OnlyAlwaysInlining);
++#endif
++
+   Opts.ExperimentalNewPassManager = Args.hasFlag(
+       OPT_fexperimental_new_pass_manager, OPT_fno_experimental_new_pass_manager,
+       /* Default */ ENABLE_EXPERIMENTAL_NEW_PASS_MANAGER);
+@@ -3054,6 +3062,11 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
+     if (InlineArg->getOption().matches(options::OPT_fno_inline))
+       Opts.NoInlineDefine = true;
+ 
++#ifdef KA_DISABLE_INLINING
++  // nvd: turn off inline
++  Opts.NoInlineDefine = true;
++#endif
++
+   Opts.FastMath = Args.hasArg(OPT_ffast_math) ||
+       Args.hasArg(OPT_cl_fast_relaxed_math);
+   Opts.FiniteMathOnly = Args.hasArg(OPT_ffinite_math_only) ||
+-- 
+2.17.1
+
