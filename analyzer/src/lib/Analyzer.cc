@@ -32,6 +32,7 @@
 #include "SecurityChecks.h"
 #include "MissingChecks.h"
 #include "PointerAnalysis.h"
+#include "TypeInitializer.h"
 
 using namespace llvm;
 
@@ -158,6 +159,11 @@ int main(int argc, char **argv) {
 
 	// Main workflow
 	LoadStaticData(&GlobalCtx);
+	
+	// Initilaize gloable type map
+	TypeInitializerPass TIPass(&GlobalCtx);
+	TIPass.run(GlobalCtx.Modules);
+	TIPass.BuildTypeStructMap();
 
 	// Build global callgraph.
 	CallGraphPass CGPass(&GlobalCtx);

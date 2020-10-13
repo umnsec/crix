@@ -13,6 +13,8 @@ set (AnalyzerSourceCodes
 	DataFlowAnalysis.cc
 	MissingChecks.h
 	MissingChecks.cc
+	TypeInitializer.cc
+	TypeInitializer.h
 	)
 
 file(COPY configs/ DESTINATION configs)

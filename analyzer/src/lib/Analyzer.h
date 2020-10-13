@@ -40,7 +40,7 @@ typedef DenseMap<CallInst *, FuncSet> CalleeMap;
 typedef DenseMap<Value *, SmallPtrSet<Value *, 16>> PointerAnalysisMap;
 typedef unordered_map<Function *, PointerAnalysisMap> FuncPointerAnalysisMap;
 typedef unordered_map<Function *, AAResults *> FuncAAResultsMap;
-
+typedef map<Type*, string> TypeNameMap;
 
 struct GlobalContext {
 
@@ -52,6 +52,9 @@ struct GlobalContext {
 
 	unsigned NumSecurityChecks;
 	unsigned NumCondStatements;
+	
+	// Map global types to type_name
+	TypeNameMap GlobalTypes;
 
 	// Map global function name to function.
 	NameFuncMap GlobalFuncs;
@@ -67,6 +70,7 @@ struct GlobalContext {
 
 	// Indirect call instructions.
 	std::vector<CallInst *>IndirectCallInsts;
+	
 
 	// Unified functions -- no redundant inline functions
 	DenseMap<size_t, Function *>UnifiedFuncMap;

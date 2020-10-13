@@ -337,13 +337,43 @@ size_t callHash(CallInst *CI) {
 	}
 }
 
+string HandleSimpleTy(Type *Ty){
+	unsigned size = Ty->getScalarSizeInBits();
+	string ret = std::to_string(size);
+	return ret;
+}
+
+string expand_struct(StructType *STy) {
+	string ty_str = "";
+	unsigned NumEle = STy->getNumElements();
+	uint64_t TySize = CurrentLayout->getStructLayout(STy)->getSizeInBits();
+	ty_str = ty_str+to_string(NumEle)+","+to_string(TySize);
+	return ty_str;
+}
+
+
 size_t typeHash(Type *Ty) {
 	hash<string> str_hash;
 	string sig;
 
 	raw_string_ostream rso(sig);
-	Ty->print(rso);
-	string ty_str = rso.str();
+	string ty_str = "";
+	StructType *STy = dyn_cast<StructType>(Ty);
+	if (STy == NULL)
+		ty_str = ty_str+HandleSimpleTy(Ty);
+	else {
+		//Struct type
+		if (STy->hasName()) {
+			string STyname = STy->getName();
+			ty_str = ty_str + STyname + expand_struct(STy);
+		} else if (TypeToTNameMap.find(Ty) != TypeToTNameMap.end()){
+			ty_str = ty_str + TypeToTNameMap[Ty]+expand_struct(STy);
+		} else{
+			ty_str = ty_str +  expand_struct(STy);
+		}
+	}
+	
+	
 	string::iterator end_pos = remove(ty_str.begin(), ty_str.end(), ' ');
 	ty_str.erase(end_pos, ty_str.end());
 

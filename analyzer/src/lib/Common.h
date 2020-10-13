@@ -43,6 +43,8 @@ using namespace std;
 #define KWHT  "\x1B[37m"  /* White */
 
 extern cl::opt<unsigned> VerboseLevel;
+extern map<Type*, string> TypeToTNameMap;
+extern const DataLayout *CurrentLayout;
 
 //
 // Common functions
@@ -77,6 +79,10 @@ size_t callHash(CallInst *CI);
 size_t typeHash(Type *Ty);
 size_t typeIdxHash(Type *Ty, int Idx = -1);
 size_t hashIdxHash(size_t Hs, int Idx = -1);
+
+string HandleSimpleTy(Type *Ty);
+string expand_struct(StructType *STy);
+
 
 void getSourceCodeLine(Value *V, string &line);
 //

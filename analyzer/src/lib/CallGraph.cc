@@ -43,7 +43,7 @@ DenseMap<size_t, FuncSet> CallGraphPass::typeFuncsMap;
 unordered_map<size_t, set<size_t>> CallGraphPass::typeConfineMap;
 unordered_map<size_t, set<size_t>> CallGraphPass::typeTransitMap;
 set<size_t> CallGraphPass::typeEscapeSet;
-
+const DataLayout *CurrentLayout;
 // Find targets of indirect calls based on type analysis: as long as
 // the number and type of parameters of a function matches with the
 // ones of the callsite, we say the function is a possible target of
@@ -502,24 +502,37 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
 				FS2 = typeFuncsMap[hashIdxHash(H, FieldIdx)];
 				FST.clear();
 				funcSetIntersection(FS1, FS2, FST);
-				FS1 = FST;
+				if (FST.size() != 0)
+					FS1 = FST;
 			}
 		}
 #endif
 
 		// Step 4: go to a lower layer
 		CV = nextLayerBaseType(CV, LayerTy, FieldIdx, DL);
-		FS1 = FST;
+		if (FST.size() != 0)
+			FS1 = FST;
 	}
 
 	FS = FS1;
-
+#if 0
+	if (LayerNo > 1 && FS.size()) {
+		OP<<"[CallGraph] Indirect call: "<<*CI<<"\n";
+		printSourceCodeInfo(CI);
+		OP<<"\n\t Indirect-call targets:\n";
+		for (auto F : FS) {
+			printSourceCodeInfo(F);
+		}
+		OP<<"\n";
+	}
+#endif
 	return true;
 }
 
 bool CallGraphPass::doInitialization(Module *M) {
 
 	DL = &(M->getDataLayout());
+	CurrentLayout = DL;
 	Int8PtrTy = Type::getInt8PtrTy(M->getContext());
 	IntPtrTy = DL->getIntPtrType(M->getContext());
 
