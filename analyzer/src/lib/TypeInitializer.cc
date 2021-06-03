@@ -21,6 +21,9 @@ bool TypeInitializerPass::doInitialization(Module *M) {
 			ge = M->global_end(); gi != ge; ++gi) {
 		GlobalValue *GV = &*gi;
 		Type *GVTy = GV->getValueType();
+		
+		if (!GV->hasName())
+			continue;
 		string Vname = GV->getName();
 		if (StructType *GVSTy = dyn_cast<StructType>(GVTy)) {
 			if(GVSTy->hasName())
@@ -54,6 +57,8 @@ bool TypeInitializerPass::doInitialization(Module *M) {
 					continue;
 
 				if (StructType *SVT = dyn_cast<StructType>(VT)) {
+					if(!VI->hasName() || !SVT->hasName())
+						continue;
 					string ValueName = VI->getName();
 					string StructName = SVT->getName();
 					//OP<<ValueName<<"\t"<<StructName<<"\n";

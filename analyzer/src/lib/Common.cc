@@ -346,7 +346,12 @@ string HandleSimpleTy(Type *Ty){
 string expand_struct(StructType *STy) {
 	string ty_str = "";
 	unsigned NumEle = STy->getNumElements();
-	uint64_t TySize = CurrentLayout->getStructLayout(STy)->getSizeInBits();
+	uint64_t TySize;
+	// TODO: Handle opaque structures
+	if (STy->isOpaque())
+		TySize = 0;
+	else
+		TySize = CurrentLayout->getStructLayout(STy)->getSizeInBits();
 	ty_str = ty_str+to_string(NumEle)+","+to_string(TySize);
 	return ty_str;
 }
