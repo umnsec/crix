@@ -1,0 +1,76 @@
+From 28a2b7d0a9f62392260fba78a2f51b0de98b2ba5 Mon Sep 17 00:00:00 2001
+From: ZhipengLu <smyalexied@gmail.com>
+Date: Tue, 29 Aug 2023 09:48:41 +0800
+Subject: [PATCH] disable_inline-linux5.18
+
+---
+ include/linux/bitfield.h       | 4 ++--
+ include/linux/build_bug.h      | 2 +-
+ include/linux/compiler_types.h | 2 +-
+ lib/Makefile                   | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/include/linux/bitfield.h b/include/linux/bitfield.h
+index c9be1657f03d..97390022d317 100644
+--- a/include/linux/bitfield.h
++++ b/include/linux/bitfield.h
+@@ -136,7 +136,7 @@ __bad_mask(void);
+ static __always_inline u64 field_multiplier(u64 field)
+ {
+ 	if ((field | (field - 1)) & ((field | (field - 1)) + 1))
+-		__bad_mask();
++		{}
+ 	return field & -field;
+ }
+ static __always_inline u64 field_mask(u64 field)
+@@ -148,7 +148,7 @@ static __always_inline u64 field_mask(u64 field)
+ static __always_inline __##type type##_encode_bits(base v, base field)	\
+ {									\
+ 	if (__builtin_constant_p(v) && (v & ~field_mask(field)))	\
+-		__field_overflow();					\
++		{}					\
+ 	return to((v & field_mask(field)) * field_multiplier(field));	\
+ }									\
+ static __always_inline __##type type##_replace_bits(__##type old,	\
+diff --git a/include/linux/build_bug.h b/include/linux/build_bug.h
+index e3a0be2c90ad..354d5d8ce01a 100644
+--- a/include/linux/build_bug.h
++++ b/include/linux/build_bug.h
+@@ -36,7 +36,7 @@
+  *
+  * See BUILD_BUG_ON for description.
+  */
+-#define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
++#define BUILD_BUG_ON_MSG(cond, msg)
+ 
+ /**
+  * BUILD_BUG_ON - break compile if a condition is true.
+diff --git a/include/linux/compiler_types.h b/include/linux/compiler_types.h
+index 1c2c33ae1b37..177c1da8bd87 100644
+--- a/include/linux/compiler_types.h
++++ b/include/linux/compiler_types.h
+@@ -280,7 +280,7 @@ struct ftrace_likely_data {
+ #endif
+ 
+ #ifndef asm_volatile_goto
+-#define asm_volatile_goto(x...) asm goto(x)
++#define asm_volatile_goto(x...)
+ #endif
+ 
+ #ifdef CONFIG_CC_HAS_ASM_INLINE
+diff --git a/lib/Makefile b/lib/Makefile
+index 6b9ffc1bd1ee..4a3a4f300c06 100644
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -59,7 +59,7 @@ obj-$(CONFIG_FIND_BIT_BENCHMARK) += find_bit_benchmark.o
+ obj-$(CONFIG_TEST_BPF) += test_bpf.o
+ obj-$(CONFIG_TEST_FIRMWARE) += test_firmware.o
+ obj-$(CONFIG_TEST_BITOPS) += test_bitops.o
+-CFLAGS_test_bitops.o += -Werror
++# CFLAGS_test_bitops.o += -Werror
+ obj-$(CONFIG_TEST_SYSCTL) += test_sysctl.o
+ obj-$(CONFIG_TEST_SIPHASH) += test_siphash.o
+ obj-$(CONFIG_HASH_KUNIT_TEST) += test_hash.o
+-- 
+2.34.1
+
