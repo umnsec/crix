@@ -1,0 +1,28 @@
+From 179868bd3ec0f5899f9ae1f6b21b3495043c813b Mon Sep 17 00:00:00 2001
+From: ZhipengLu <smyalexied@gmail.com>
+Date: Mon, 28 Aug 2023 22:09:30 +0800
+Subject: [PATCH] disable-inline_llvm_15
+
+---
+ clang/lib/CodeGen/CodeGenModule.cpp | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/clang/lib/CodeGen/CodeGenModule.cpp b/clang/lib/CodeGen/CodeGenModule.cpp
+index 2346176a1562..f0e56f2e2322 100644
+--- a/clang/lib/CodeGen/CodeGenModule.cpp
++++ b/clang/lib/CodeGen/CodeGenModule.cpp
+@@ -1943,6 +1943,11 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
+       B.addAttribute(llvm::Attribute::MinSize);
+   }
+ 
++  //Force to add NoInline and remove AlwaysInline & InlineHint in any situation
++  B.addAttribute(llvm::Attribute::NoInline);
++  B.removeAttribute(llvm::Attribute::AlwaysInline);
++  B.removeAttribute(llvm::Attribute::InlineHint);
++  
+   F->addFnAttrs(B);
+ 
+   unsigned alignment = D->getMaxAlignment() / Context.getCharWidth();
+-- 
+2.34.1
+
